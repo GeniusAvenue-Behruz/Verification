@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluent Future Admin Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f4f4f9;
+    }
+    .scanner-container {
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      text-align: center;
+    }
+    video {
+      width: 300px;
+      height: 200px;
+      border: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .message-box {
+      display: none;
+      background-color: #28a745;
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="scanner-container">
+    <h2>Scan the Line Barcode</h2>
+    <video id="scanner" autoplay></video>
+    <div id="messageBox" class="message-box">Verification Success</div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script>
+    const targetBarcode = "T_6049473";
+    const videoElement = document.querySelector('#scanner');
+
+    console.log("Requesting camera access...");
+
+    // Function to get camera devices
+    function getCameras() {
+      navigator.mediaDevices.enumerateDevices().then(function(devices) {
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log("Available cameras:", videoDevices);
+
+        // Use the 4th camera (or whichever you want to access)
+        if (videoDevices.length > 3) {
+          const cameraId = videoDevices[3].deviceId;
+          startCamera(cameraId); // Start the camera using the specific deviceId
+        } else {
+          console.warn("4th camera not available. Defaulting to the first camera.");
+          startCamera(videoDevices[0].deviceId); // Fallback to the first camera
+        }
+      }).catch(function(err) {
+        console.error("Error accessing video devices:", err);
+      });
+    }
+
+    // Function to start the camera with a specific deviceId
+    function startCamera(deviceId) {
+      navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId }, width: 300, height: 200 }
+      })
+      .then(function(stream) {
+        console.log("Camera stream started with deviceId:", deviceId);
+        videoElement.srcObject = stream;
+
+        videoElement.onloadedmetadata = () => {
+          console.log("Video metadata loaded, playing video...");
+          videoElement.play();
+        };
+      })
+      .catch(function(err) {
+        console.error("Error accessing the camera:", err);
+      });
+    }
+
+    // Call getCameras to list and select the correct camera
+    getCameras();
+
+    // Initialize QuaggaJS
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: videoElement,
+        constraints: {
+          width: 300,
+          height: 200,
+        },
+      },
+      decoder: {
+        readers: ["code_128_reader"] // Supports Code 128 barcodes
+      }
+    }, function(err) {
+      if (err) {
+        console.error("Error during Quagga initialization:", err);
+        return;
+      }
+      console.log("Quagga initialization successful. Starting scanner...");
+      Quagga.start();
+    });
+
+    // Detect the barcode and check if it matches
+    Quagga.onDetected(function(data) {
+      const scannedCode = data.codeResult.code;
+      console.log("Barcode detected:", scannedCode);
+
+      if (scannedCode === targetBarcode) {
+        console.log("Barcode match! Verification success.");
+        document.getElementById("messageBox").style.display = "block"; // Show success message
+        Quagga.stop(); // Stop scanning after successful verification
+      } else {
+        console.log("Barcode does not match:", scannedCode);
+      }
+    });
+
+  </script>
+
+</body>
+</html>
