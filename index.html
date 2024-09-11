@@ -39,7 +39,7 @@
 
   <div class="scanner-container">
     <h2>Scan the Line Barcode</h2>
-    <video id="scanner" autoplay></video>
+    <video id="scanner" autoplay playsinline></video>
     <div id="messageBox" class="message-box">Verification Success</div>
   </div>
 
@@ -56,13 +56,11 @@
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log("Available cameras:", videoDevices);
 
-        // Use the 4th camera (or whichever you want to access)
-        if (videoDevices.length > 3) {
-          const cameraId = videoDevices[3].deviceId;
-          startCamera(cameraId); // Start the camera using the specific deviceId
+        if (videoDevices.length > 0) {
+          // Use the first available camera if only one exists
+          startCamera(videoDevices[0].deviceId); 
         } else {
-          console.warn("4th camera not available. Defaulting to the first camera.");
-          startCamera(videoDevices[0].deviceId); // Fallback to the first camera
+          console.warn("No cameras available.");
         }
       }).catch(function(err) {
         console.error("Error accessing video devices:", err);
@@ -71,13 +69,21 @@
 
     // Function to start the camera with a specific deviceId
     function startCamera(deviceId) {
-      navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId }, width: 300, height: 200 }
-      })
+      const constraints = {
+        video: { width: 300, height: 200 }
+      };
+
+      if (deviceId) {
+        constraints.video.deviceId = { exact: deviceId };  // Use specific deviceId if available
+      }
+
+      navigator.mediaDevices.getUserMedia(constraints)
       .then(function(stream) {
         console.log("Camera stream started with deviceId:", deviceId);
         videoElement.srcObject = stream;
 
+        // Check if the stream is being added to the video element
+        console.log("Stream details: ", stream);
         videoElement.onloadedmetadata = () => {
           console.log("Video metadata loaded, playing video...");
           videoElement.play();
@@ -90,6 +96,20 @@
 
     // Call getCameras to list and select the correct camera
     getCameras();
+
+    // Listen for errors in video playback
+    videoElement.addEventListener('error', function(err) {
+      console.error("Video element error:", err);
+    });
+
+    // Listen for any issues with playing the video stream
+    videoElement.addEventListener('stalled', function() {
+      console.warn("Video stalled, check camera connection or stream.");
+    });
+
+    videoElement.addEventListener('abort', function() {
+      console.warn("Video stream aborted.");
+    });
 
     // Initialize QuaggaJS
     Quagga.init({
